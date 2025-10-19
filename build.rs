@@ -1444,15 +1444,9 @@ fn main() {
         ],
     );
 
-    let clang_includes = include_paths
-        .iter()
-        .map(|include| format!("-I{}", include.to_string_lossy()));
-
     // macOS SDK path detection for bindgen
     // On macOS 10.14+, system headers (like time.h) are in the SDK, not /usr/include
-    // We need to tell libclang (used by bindgen) where to find them
-    let mut clang_args: Vec<String> = clang_includes.collect();
-
+    // We need to tell libclang (used by bindgen) where to find them via BINDGEN_EXTRA_CLANG_ARGS
     // Check if we're building for macOS (not if we're ON macOS - important for cross-compilation)
     if matches!(env::var("CARGO_CFG_TARGET_OS").as_deref(), Ok("macos") | Ok("ios")) {
         if let Ok(output) = Command::new("xcrun")
@@ -1463,13 +1457,22 @@ fn main() {
                 if let Ok(sdk_path) = String::from_utf8(output.stdout) {
                     let sdk_path = sdk_path.trim();
                     println!("cargo:warning=Using macOS SDK path for bindgen: {}", sdk_path);
-                    clang_args.push("-isysroot".to_string());
-                    clang_args.push(sdk_path.to_string());
-                    clang_args.push(format!("-I{}/usr/include", sdk_path));
+
+                    // Set BINDGEN_EXTRA_CLANG_ARGS environment variable with SDK flags
+                    // This is the most reliable way to ensure bindgen's libclang finds system headers
+                    let extra_clang_args = format!("-isysroot {} -I{}/usr/include", sdk_path, sdk_path);
+                    env::set_var("BINDGEN_EXTRA_CLANG_ARGS", &extra_clang_args);
+                    println!("cargo:warning=Set BINDGEN_EXTRA_CLANG_ARGS={}", extra_clang_args);
                 }
             }
         }
     }
+
+    let clang_includes = include_paths
+        .iter()
+        .map(|include| format!("-I{}", include.to_string_lossy()));
+
+    let clang_args: Vec<String> = clang_includes.collect();
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
