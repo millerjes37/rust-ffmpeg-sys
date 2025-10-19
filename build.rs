@@ -1448,11 +1448,32 @@ fn main() {
         .iter()
         .map(|include| format!("-I{}", include.to_string_lossy()));
 
+    // macOS SDK path detection for bindgen
+    // On macOS 10.14+, system headers (like time.h) are in the SDK, not /usr/include
+    // We need to tell libclang (used by bindgen) where to find them
+    let mut clang_args: Vec<String> = clang_includes.collect();
+
+    if cfg!(target_os = "macos") {
+        if let Ok(output) = Command::new("xcrun")
+            .args(["--show-sdk-path"])
+            .output()
+        {
+            if output.status.success() {
+                if let Ok(sdk_path) = String::from_utf8(output.stdout) {
+                    let sdk_path = sdk_path.trim();
+                    println!("cargo:warning=Using macOS SDK path for bindgen: {}", sdk_path);
+                    clang_args.push(format!("-isysroot{}", sdk_path));
+                    clang_args.push(format!("-I{}/usr/include", sdk_path));
+                }
+            }
+        }
+    }
+
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
     let mut builder = bindgen::Builder::default()
-        .clang_args(clang_includes)
+        .clang_args(clang_args)
         .ctypes_prefix("libc")
         // https://github.com/rust-lang/rust-bindgen/issues/550
         .blocklist_type("max_align_t")
