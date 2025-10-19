@@ -1453,7 +1453,8 @@ fn main() {
     // We need to tell libclang (used by bindgen) where to find them
     let mut clang_args: Vec<String> = clang_includes.collect();
 
-    if cfg!(target_os = "macos") {
+    // Check if we're building for macOS (not if we're ON macOS - important for cross-compilation)
+    if matches!(env::var("CARGO_CFG_TARGET_OS").as_deref(), Ok("macos") | Ok("ios")) {
         if let Ok(output) = Command::new("xcrun")
             .args(["--show-sdk-path"])
             .output()
