@@ -1462,7 +1462,8 @@ fn main() {
                 if let Ok(sdk_path) = String::from_utf8(output.stdout) {
                     let sdk_path = sdk_path.trim();
                     println!("cargo:warning=Using macOS SDK path for bindgen: {}", sdk_path);
-                    clang_args.push(format!("-isysroot{}", sdk_path));
+                    clang_args.push("-isysroot".to_string());
+                    clang_args.push(sdk_path.to_string());
                     clang_args.push(format!("-I{}/usr/include", sdk_path));
                 }
             }
